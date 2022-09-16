@@ -1,15 +1,15 @@
 package main
 
-
-
-/*
-/api/
-/api/login
-/api/register
-/api/articles
-/api/articles/
-/api/articles/avis/
-/api/users
-/api/users/
-/api/panier
-*/
+func main(){
+	func main(){
+		http.HandleFunc("/api/")
+		http.HandleFunc("/api/login")
+		http.HandleFunc("/api/register")
+		http.HandleFunc("/api/articles")
+		http.HandleFunc("/api/articles/")
+		http.HandleFunc("/api/articles/avis/")
+		http.HandleFunc("/api/users")
+		http.HandleFunc("/api/users/")
+		http.HandleFunc("/api/panier")
+	}
+}
