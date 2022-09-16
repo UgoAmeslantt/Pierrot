@@ -5,6 +5,24 @@ import(
 	"log"
 )
 
+type Users struct {
+	ID           	int    `json:"ID"`
+	Name         	string `json:"name"`
+	Password     	string `json:"password"`
+	Confirmation	string `json:"confirmation"`
+	Email       	string `json:"email"`
+	Adresse			string
+	PP           	string `json:"PP"`
+}
+
+type Articles struct{
+	ID		int
+	Name	string
+	description string
+	prix	float64
+	picture string
+}
+
 func main(){
 	http.HandleFunc("/api/",api)
 	http.HandleFunc("/api/login",login_handler)
