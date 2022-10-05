@@ -3,152 +3,171 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"path"
+	"strconv"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-var db, _ = sql.Open("mysql", "root:@tcp(localhost)/pierre")
-var query, _ = db.Query("SELECT * FROM pierre.user")
+var db, _ = sql.Open("mysql", "root:@tcp(localhost)/pierrot")
 
-type Users struct {
-	ID           int    `json:"ID"`
-	Name         string `json:"name"`
-	Password     string `json:"password"`
-	Confirmation string `json:"confirmation"`
-	Email        string `json:"email"`
-	Adresse      string
-	PP           string `json:"PP"`
-}
-
-type Articles struct {
-	ID          int     `json:"ID"`
-	Name        string  `json:"Name"`
-	Description string  `json:"description"`
-	Prix        float64 `json:"prix"`
-	Picture     string  `json:"picture"`
-}
-
-type Avis struct {
-	ID         int    `json:"ID"`
-	Articlesid int    `json:"ArticlesId"`
-	Txt        string `json:"Txt"`
-}
-
-type Panier struct {
-	Id        int    `json:"ID"`
-	ArticleId string `json:"article-id"`
+type User struct {
+	ID        int    `json:"ID"`
+	Name      string `json:"name"`
+	Firstname string `json:"firstname"`
+	Password  string `json:"password"`
+	Email     string `json:"email"`
+	PP        string `json:"PP"`
+	Cart_ID   int    `json:"cart_ID"`
+	Birthday  string `json:"birthday"`
 }
 
 type Session struct {
-	Id         int    `json:"ID"`
-	User_id    int    `json:"User_id"`
-	Token      string `json:"token"`
-	Expiration string `json:"expiration"`
+	UserID   int
+	UserName string
+	Token    string
 }
 
-func api(w http.ResponseWriter, r *http.Request) {
-
+type Pierre struct {
+	ID                 int    `json:"ID"`
+	Pierre_name        string `json:"pierre_name"`
+	Pierre_description string `json:"pierre_description"`
+	Pierre_price       int    `json:"pierre_price"`
+	Categorie          string `json:"categorie"`
+	Avis               []Avis
+}
+type Avis struct {
+	ID        int    `json:"ID"`
+	Pierre_ID int    `json:"pierre_ID"`
+	User_ID   int    `json:"user_ID"`
+	Note      string `json:"note"`
+	Text      string `json:"text"`
 }
 
-func login_handler(w http.ResponseWriter, r *http.Request) {
-	/*w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
-	var user Users
-	var session Session
-	decoder := json.NewDecoder(r.Body)
-	decoder.Decode(&user)
-	// fmt.Println(user)
-	emailVar := `SELECT ID, NAME, PASSWORD, EMAIL FROM bobato.usr WHERE EMAIL="` + user.Email + `" AND PASSWORD="` + user.Password + `"`
-	var getRaw = db.QueryRow(emailVar)
-	getRaw.Scan(&user.ID, &user.Password, &user.Email)
-	//fmt.Println(user.Password, session.UserName)
-	// fmt.Println(user)
-	if user.ID != 0 {
-		session.Token = uuid.New().String()
-		session.User_id = user.ID
-		// fmt.Println(session.Token)
-		insert := `INSERT INTO bobato.session (USR_ID, TOKEN) VALUES (` + strconv.Itoa(session.User_id) + `,"` + session.Token + `");`
-		// fmt.Println(insert)
-		_, err := db.Query(insert)
-		a, _ := json.Marshal(session)
-		w.Write(a)
-		if err != nil {
-			// fmt.Println(err)
-		}
-
-	}
-	*/
-}
-
-func register_handler(w http.ResponseWriter, r *http.Request) {
+func apiHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
-	var register Users
-	// var session Session
+}
+
+func getPierres() []Pierre {
+	var query, _ = db.Query("SELECT * FROM pierrot.pierre")
+	var pierres []Pierre
+
+	for query.Next() {
+		var pierre Pierre
+		query.Scan(&pierre.ID, &pierre.Pierre_name, &pierre.Pierre_description, &pierre.Pierre_price, &pierre.Categorie)
+		pierre = get_avis(pierre)
+		pierres = append(pierres, pierre)
+	}
+	return pierres
+}
+func get_avis(pierre Pierre) Pierre {
+	var query, _ = db.Query("SELECT * FROM pierrot.avis")
+	for query.Next() {
+		var avis Avis
+		query.Scan(&avis.ID, &avis.Pierre_ID, &avis.User_ID, &avis.Note, &avis.Text)
+		if avis.Pierre_ID == pierre.ID {
+			pierre.Avis = append(pierre.Avis, avis)
+		}
+	}
+	fmt.Println(pierre.Avis)
+	return pierre
+
+}
+
+func registerHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+
+	//Permet de recuperer la requete en frond pour la mettre dasn la db
+
+	var register User
 	decoder := json.NewDecoder(r.Body)
 	decoder.Decode(&register)
-	// fmt.Println(register)
-
-	if register.Password == register.Confirmation {
-		insert := `INSERT INTO pierre.user (NAME, PASSWORD, EMAIL) VALUES ("` + register.Name + `","` + register.Password + `","` + register.Email + `");`
-		_, err := db.Query(insert)
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		// fmt.Println("password != confirm")
-	}
+	fmt.Println(register)
+	insert := `INSERT INTO labaiepierre.user (NAME, FIRSTNAME, PASSWORD, EMAIL, BIRTHDAY) VALUES ("` + register.Name + `","` + register.Firstname + `","` + register.Password + `","` + register.Email + `","` + register.Birthday + `")`
+	db.Query(insert)
+	selectID := `SELECT ID FROM pierrot.user WHERE EMAIL="` + register.Email + `"`
+	IDUsr := db.QueryRow(selectID)
+	IDUsr.Scan(&register.ID)
+	fmt.Println(register.ID)
+	insertCart := `INSERT INTO pierrot.cart (USER_ID) VALUES ("` + strconv.Itoa(register.ID) + `")`
+	db.Query(insertCart)
+	selectCartID := `SELECT ID FROM pierrot.cart WHERE USER_ID="` + strconv.Itoa(register.ID) + `"`
+	IDCart := db.QueryRow(selectCartID)
+	IDCart.Scan(&register.Cart_ID)
+	fmt.Println(register.Cart_ID)
+	insertCartID := `UPDATE pierrot.user SET CART_ID="` + strconv.Itoa(register.Cart_ID) + `" WHERE ID="` + strconv.Itoa(register.ID) + `"`
+	db.Query(insertCartID)
 }
 
-func articles_handler(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func artcile_handler(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func avis_handler(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func users_handler(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func user_handler(w http.ResponseWriter, r *http.Request) {
+func loginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
-	// var user []Users
-	// for query.Next() {
-	// 	var usr Users
-	// 	query.Scan(&usr.ID, &usr.Name, &usr.Password, &usr.Email, &usr.Adresse)
-	// 	user = append(user, usr)
-	// }
-	// // fmt.Println(user)
-	var querys , _ = db.Query("SELECT * FROM pierre.user")
-	var usr Users
-	querys.Scan(&usr.ID, &usr.Name, &usr.Password, &usr.Email, &usr.Adresse, &usr.PP)
+	var user User
+	decoder := json.NewDecoder(r.Body)
+	decoder.Decode(&user)
+	emailVar := `SELECT ID, NAME, FIRSTNAME, PASSWORD, EMAIL, CART_ID, BIRTHDAY FROM pierrot.user WHERE EMAIL="` + user.Email + `" AND PASSWORD="` + user.Password + `"`
+	fmt.Println(emailVar)
+	var getRaw = db.QueryRow(emailVar)
+	getRaw.Scan(&user.ID, &user.Name, &user.Firstname, &user.Password, &user.Email, &user.Cart_ID, &user.Birthday)
+	fmt.Println(user)
+}
 
-	a, _ := json.Marshal(usr)
+// func cartHandler(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Access-Control-Allow-Origin", "*")
+// 	w.Header().Set("Content-Type", "application/json")
+// 	var pierre Pierre
+// 	decoder := json.NewDecoder(r.Body)
+// 	decoder.Decode(&pierre)
+// 	pierreVar := `INSERT INTO labaiepierre.cart  (USER_ID, PIERRE_ID) VALUES ("` + strconv.Itoa(pierre.ID) + `")`
+// }
+
+func pierresHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+	a, _ := json.Marshal(getPierres())
 	w.Write(a)
 }
 
-func panier_handler(w http.ResponseWriter, r *http.Request) {
+func pierreHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+	pathID := r.URL.Path
+	pathID = path.Base(pathID)
+	pathIDint, _ := strconv.Atoi(pathID)
+	getPierresVar := getPierres()
+	a, _ := json.Marshal(getPierresVar[pathIDint-1])
+	w.Write(a)
+}
 
+func userHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+	var users []User
+	var query, _ = db.Query("SELECT * FROM pierrot.user")
+	for query.Next() {
+		var user User
+		query.Scan(&user.ID, &user.Name, &user.Firstname, &user.Password, &user.Email, &user.PP, user.Cart_ID, user.Birthday)
+		users = append(users, user)
+	}
+	fmt.Println(users)
+	a, _ := json.Marshal(users)
+	w.Write(a)
 }
 
 func main() {
-	http.HandleFunc("/api/", api)
-	http.HandleFunc("/api/login", login_handler)
-	http.HandleFunc("/api/register", register_handler)
-	http.HandleFunc("/api/articles", articles_handler)
-	http.HandleFunc("/api/articles/", artcile_handler)
-	http.HandleFunc("/api/articles/avis/", avis_handler)
-	http.HandleFunc("/api/user", user_handler)
-	http.HandleFunc("/api/users/", users_handler)
-	http.HandleFunc("/api/panier", panier_handler)
+	http.HandleFunc("/api/", apiHandler)
+	http.HandleFunc("/api/register", registerHandler)
+	http.HandleFunc("/api/login", loginHandler)
+	http.HandleFunc("/api/pierre", pierresHandler)
+	http.HandleFunc("/api/pierre/", pierreHandler)
+	// http.HandleFunc("/api/cart", cartHandler)
+	http.HandleFunc("/api/user", userHandler)
+
 	log.Fatal(http.ListenAndServe(":55", nil))
+
 }
